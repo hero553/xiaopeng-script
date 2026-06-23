@@ -1,0 +1,60 @@
+{
+  "chrome": {
+    "remote_debugging_port": 9222,
+    "user_data_dir": "data/chrome-profile",
+    "executable_path": "",
+    "incognito": false,
+    "window_width": 1440,
+    "window_height": 900,
+    "extra_args": []
+  },
+  "monitor": {
+    "target_url": "https://xiaolong.xiaopeng.com/main/sub/oas/vehicle/actuals/lock",
+    "tabs": [
+      "普通库存",
+      "限量车",
+      "专项车",
+      "可售展车"
+    ],
+    "manual_query_only": true,
+    "parallel_tabs": true,
+    "parallel_series_per_tab": 0,
+    "result_preview_limit": 3,
+    "poll_interval_seconds": 1,
+    "poll_interval_min_seconds": 1,
+    "poll_interval_max_seconds": 2,
+    "query_timeout_ms": 15000,
+    "notify_once": true,
+    "notify_cooldown_seconds": 7200,
+    "state_file": "data/notified.json",
+    "series_name_exclude": [
+      "全部"
+    ]
+  },
+  "wechat": {
+    "enabled": true,
+    "provider": "bark",
+    "providers": [
+      "bark",
+      "ntfy"
+    ],
+    "bark_server_url": "https://api.day.app",
+    "bark_title": "小鹏库存提醒",
+    "bark_device_key": "",
+    "bark_device_keys_file": "config/bark_keys.txt",
+    "bark_group": "小鹏库存",
+    "bark_level": "critical",
+    "bark_sound": "alarm",
+    "bark_badge": 1,
+    "ntfy_server_url": "https://ntfy.sh",
+    "ntfy_topic": "topic_guantiantian_notify",
+    "ntfy_token": "",
+    "ntfy_priority": "urgent",
+    "ntfy_tags": "car,warning",
+    "pushplus_token": "",
+    "pushplus_topic": "",
+    "serverchan_sendkey": "",
+    "work_wechat_webhook_url": "",
+    "users_file": "config/wechat_users.txt"
+  }
+}

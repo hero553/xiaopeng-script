@@ -1,0 +1,6 @@
+# Bark 接收设备 key，每行一个。
+# iPhone 安装 Bark 后，首页会显示类似 https://api.day.app/你的key 的测试地址。
+# 可以只填最后的 key，也可以直接粘完整 URL。
+# 带标题的推送格式类似：
+# https://api.day.app/你的key/推送标题/这里改成你自己的推送内容
+aTEzdWw2exUjjDsuQezmfT

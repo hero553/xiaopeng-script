@@ -1,0 +1,4 @@
+# 默认 providers=["bark","ntfy"] 时不需要这个文件。
+#
+# 只有 providers 包含 work_wechat 企业微信机器人模式下才需要：
+# 每行一个企业微信 user_id、手机号，或 @all。

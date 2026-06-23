@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "xiaopeng-script"
+version = "0.1.0"
+description = "Xiaopeng inventory monitor with Chrome CDP automation and WeChat notifications."
+requires-python = ">=3.10"
+dependencies = [
+  "playwright>=1.45.0",
+]
+
+[project.scripts]
+xiaopeng-monitor = "xiaopeng_script.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
