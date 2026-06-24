@@ -6,3 +6,4 @@ build/
 dist/
 data/
 logs/
+config/config.local.json

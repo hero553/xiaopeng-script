@@ -30,7 +30,22 @@ python -m pip install -e .
 
 ## 配置
 
-主配置文件是 `config/config.json`。
+开发环境默认会优先读取 `config/config.local.json`，如果这个文件不存在，再回退到 `config/config.json`。
+
+- `config/config.json`：建议作为可提交的示例配置
+- `config/config.local.json`：建议放你自己的本地实际配置，已加入 `.gitignore`
+
+打包后的可执行文件会优先读取它同级目录下的 `config.json`，推荐直接改这个文件：
+
+```text
+dist/
+├── xiaopeng-monitor
+└── config.json
+```
+
+你要的轮询时间、`ntfy topic`、`bark key` 都可以直接放在这个同级 `config.json` 里，不用再重新打包。
+
+打包时自动生成的是一份精简版配置，只保留最常改的字段，其他参数由程序默认值兜底。
 
 默认推荐同时开启 `Bark + ntfy`：
 
@@ -47,8 +62,9 @@ python -m pip install -e .
 
 1. iPhone 安装 Bark。
 2. 打开 Bark 首页，复制类似 `https://api.day.app/你的key` 的测试地址。
-3. 把最后的 key 填到 `config/bark_keys.txt`，也可以直接粘完整 URL。
-4. 在 `config/config.json` 里保留 `providers: ["bark", "ntfy"]`，这样 iOS 和安卓都能收到。
+3. 推荐把最后的 key 直接填到配置文件里的 `bark_device_keys` 数组，也可以直接粘完整 URL。
+4. 兼容老配置时，也仍然支持 `config/bark_keys.txt` 这种单独文件方式。
+5. 在配置文件里保留 `providers: ["bark", "ntfy"]`，这样 iOS 和安卓都能收到。
 
 ```json
 {
@@ -59,6 +75,7 @@ python -m pip install -e .
     "bark_server_url": "https://api.day.app",
     "bark_title": "小鹏库存提醒",
     "bark_device_key": "",
+    "bark_device_keys": ["你的BarkKey1", "你的BarkKey2"],
     "bark_device_keys_file": "config/bark_keys.txt",
     "bark_group": "小鹏库存",
     "bark_level": "timeSensitive",
@@ -85,7 +102,7 @@ xiaopeng-monitor --test-notify --test-message "小鹏库存巡检测试通知"
 1. 手机安装 ntfy App。
 2. 自己想一个足够随机的 topic，比如 `xp-lock-你的名字-一串随机数字`。
 3. 在 ntfy App 里订阅这个 topic。
-4. 把同一个 topic 填到 `config/config.json`。
+4. 把同一个 topic 填到配置文件的 `ntfy_topic`。
 
 公共服务地址是 `https://ntfy.sh`。topic 相当于收件地址，建议取得随机一些，不要用姓名、手机号这种容易猜到的内容。
 
@@ -167,7 +184,7 @@ xiaopeng-monitor --test-notify --test-message "小鹏库存巡检测试通知"
 zhangsan
 ```
 
-如果要用无痕窗口，把 `config/config.json` 里的 `chrome.incognito` 改为 `true`。无痕窗口关闭后登录状态不会保留。
+如果要用无痕窗口，把配置文件里的 `chrome.incognito` 改为 `true`。无痕窗口关闭后登录状态不会保留。
 
 ## 运行
 
@@ -205,6 +222,14 @@ xiaopeng-monitor --wait-login
 `monitor.poll_interval_min_seconds` 和 `monitor.poll_interval_max_seconds` 用来控制每轮之间的随机等待时间。
 
 - 例如最小 `1`、最大 `2`，就表示每轮结束后随机等待 `1` 到 `2` 秒再开始下一轮。
+
+如果你想固定轮询时间，直接把下面三个值改成一样就行：
+
+- `monitor.poll_interval_seconds`
+- `monitor.poll_interval_min_seconds`
+- `monitor.poll_interval_max_seconds`
+
+例如都设成 `5`，就是每 5 秒固定跑一轮。
 
 `monitor.notify_cooldown_seconds` 用来控制相同数据的重复提醒冷却时间。
 
@@ -259,7 +284,7 @@ Windows PowerShell:
 .\scripts\build_windows.ps1
 ```
 
-打包后产物在 `dist/` 目录。
+打包后产物在 `dist/` 目录，并且会自动生成一个程序同级的精简版 `config.json`，后续直接改它就行。
 
 ## 重要说明
 

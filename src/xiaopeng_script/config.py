@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import random
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -48,7 +49,8 @@ class WechatConfig:
     bark_server_url: str = "https://api.day.app"
     bark_title: str = "小鹏库存提醒"
     bark_device_key: str = ""
-    bark_device_keys_file: Path = Path("config/bark_keys.txt")
+    bark_device_keys: list[str] = field(default_factory=list)
+    bark_device_keys_file: Path | None = Path("config/bark_keys.txt")
     bark_group: str = "小鹏库存"
     bark_level: str = "timeSensitive"
     bark_sound: str = "alarm"
@@ -70,6 +72,34 @@ class AppConfig:
     chrome: ChromeConfig = field(default_factory=ChromeConfig)
     monitor: MonitorConfig = field(default_factory=MonitorConfig)
     wechat: WechatConfig = field(default_factory=WechatConfig)
+
+
+def get_runtime_base_dir() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path.cwd().resolve()
+
+
+def resolve_default_config_path(raw_config_path: str | None = None) -> Path:
+    if raw_config_path:
+        return Path(raw_config_path).expanduser()
+
+    if getattr(sys, "frozen", False):
+        runtime_base_dir = get_runtime_base_dir()
+        standalone_config_path = runtime_base_dir / "config.json"
+        legacy_config_path = runtime_base_dir / "config" / "config.json"
+        if standalone_config_path.exists() or not legacy_config_path.exists():
+            return standalone_config_path
+        return legacy_config_path
+
+    local_config_path = Path("config/config.local.json").expanduser()
+    if local_config_path.exists():
+        return local_config_path
+    return Path("config/config.json").expanduser()
+
+
+def get_config_base_dir(config_path: Path) -> Path:
+    return _guess_base_dir(config_path.expanduser().resolve())
 
 
 def load_app_config(config_path: Path) -> AppConfig:
@@ -171,9 +201,13 @@ def load_app_config(config_path: Path) -> AppConfig:
         ),
         bark_title=str(wechat_raw.get("bark_title", WechatConfig.bark_title)),
         bark_device_key=str(wechat_raw.get("bark_device_key", "")),
-        bark_device_keys_file=_resolve_path(
+        bark_device_keys=_normalize_string_list(
+            wechat_raw.get("bark_device_keys", [])
+        ),
+        bark_device_keys_file=_resolve_optional_path(
             wechat_raw.get(
-                "bark_device_keys_file", str(WechatConfig.bark_device_keys_file)
+                "bark_device_keys_file",
+                str(WechatConfig.bark_device_keys_file or ""),
             ),
             base_dir,
         ),
@@ -209,56 +243,9 @@ def write_default_config(config_path: Path, overwrite: bool = False) -> None:
         return
 
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    payload: dict[str, Any] = {
-        "chrome": {
-            "remote_debugging_port": 9222,
-            "user_data_dir": "data/chrome-profile",
-            "executable_path": "",
-            "incognito": False,
-            "window_width": 1440,
-            "window_height": 900,
-            "extra_args": [],
-        },
-        "monitor": {
-            "target_url": TARGET_URL,
-            "tabs": TAB_NAMES,
-            "manual_query_only": True,
-            "parallel_tabs": False,
-            "parallel_series_per_tab": 4,
-            "result_preview_limit": 3,
-            "poll_interval_seconds": 30,
-            "poll_interval_min_seconds": 30,
-            "poll_interval_max_seconds": 30,
-            "query_timeout_ms": 15000,
-            "notify_once": True,
-            "notify_cooldown_seconds": 7200,
-            "state_file": "data/notified.json",
-            "series_name_exclude": DEFAULT_EXCLUDED_SERIES_NAMES,
-        },
-        "wechat": {
-            "enabled": True,
-            "provider": "bark",
-            "providers": ["bark", "ntfy"],
-            "bark_server_url": "https://api.day.app",
-            "bark_title": "小鹏库存提醒",
-            "bark_device_key": "",
-            "bark_device_keys_file": "config/bark_keys.txt",
-            "bark_group": "小鹏库存",
-            "bark_level": "timeSensitive",
-            "bark_sound": "alarm",
-            "bark_badge": 1,
-            "ntfy_server_url": "https://ntfy.sh",
-            "ntfy_topic": "",
-            "ntfy_token": "",
-            "ntfy_priority": "high",
-            "ntfy_tags": "car,warning",
-            "pushplus_token": "",
-            "pushplus_topic": "",
-            "serverchan_sendkey": "",
-            "work_wechat_webhook_url": "",
-            "users_file": "config/wechat_users.txt",
-        },
-    }
+    payload = _build_default_config_payload(
+        is_standalone_config=config_path.parent.name != "config"
+    )
     config_path.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
     )
@@ -267,17 +254,21 @@ def write_default_config(config_path: Path, overwrite: bool = False) -> None:
 def ensure_default_files(config_path: Path) -> None:
     write_default_config(config_path=config_path, overwrite=False)
     base_dir = _guess_base_dir(config_path.expanduser().resolve())
-    bark_keys_file = _resolve_path("config/bark_keys.txt", base_dir)
-    bark_keys_file.parent.mkdir(parents=True, exist_ok=True)
-    if not bark_keys_file.exists():
-        bark_keys_file.write_text(
-            "# Bark 接收设备 key，每行一个。\n"
-            "# iPhone 安装 Bark 后，首页会显示类似 https://api.day.app/你的key 的测试地址。\n"
-            "# 把最后的 key 填到这里。\n",
-            encoding="utf-8",
-        )
+    if config_path.parent.name == "config":
+        bark_keys_file = _resolve_path("config/bark_keys.txt", base_dir)
+        bark_keys_file.parent.mkdir(parents=True, exist_ok=True)
+        if not bark_keys_file.exists():
+            bark_keys_file.write_text(
+                "# Bark 接收设备 key，每行一个。\n"
+                "# iPhone 安装 Bark 后，首页会显示类似 https://api.day.app/你的key 的测试地址。\n"
+                "# 把最后的 key 填到这里。\n",
+                encoding="utf-8",
+            )
 
-    users_file = _resolve_path("config/wechat_users.txt", base_dir)
+    users_file = _resolve_path(
+        "config/wechat_users.txt" if config_path.parent.name == "config" else "wechat_users.txt",
+        base_dir,
+    )
     users_file.parent.mkdir(parents=True, exist_ok=True)
     if not users_file.exists():
         users_file.write_text(
@@ -293,6 +284,16 @@ def _resolve_path(raw_path: str | Path, base_dir: Path) -> Path:
     if path.is_absolute():
         return path
     return (base_dir / path).resolve()
+
+
+def _resolve_optional_path(raw_path: str | Path | None, base_dir: Path) -> Path | None:
+    if raw_path is None:
+        return None
+
+    normalized_raw_path = str(raw_path).strip()
+    if not normalized_raw_path:
+        return None
+    return _resolve_path(normalized_raw_path, base_dir)
 
 
 def get_poll_interval_range(config: MonitorConfig) -> tuple[int, int]:
@@ -332,11 +333,9 @@ def _normalize_wechat_providers(
     raw_providers: Any,
     fallback_provider: str,
 ) -> list[str]:
-    normalized_values: list[str] = []
-    if isinstance(raw_providers, list):
-        normalized_values = [str(value).strip().lower() for value in raw_providers]
-    elif isinstance(raw_providers, str):
-        normalized_values = [raw_providers.strip().lower()]
+    normalized_values = [
+        value.lower() for value in _normalize_string_list(raw_providers)
+    ]
 
     filtered_values = [value for value in normalized_values if value]
     if filtered_values:
@@ -346,3 +345,88 @@ def _normalize_wechat_providers(
     if fallback_value:
         return [fallback_value]
     return []
+
+
+def _normalize_string_list(raw_values: Any) -> list[str]:
+    if isinstance(raw_values, list):
+        return [str(value).strip() for value in raw_values if str(value).strip()]
+    if isinstance(raw_values, str):
+        normalized_value = raw_values.strip()
+        return [normalized_value] if normalized_value else []
+    return []
+
+
+def _build_default_config_payload(is_standalone_config: bool) -> dict[str, Any]:
+    if is_standalone_config:
+        return {
+            "monitor": {
+                "parallel_tabs": False,
+                "parallel_series_per_tab": 4,
+                "poll_interval_seconds": 30,
+                "poll_interval_min_seconds": 30,
+                "poll_interval_max_seconds": 30,
+                "notify_cooldown_seconds": 7200,
+            },
+            "wechat": {
+                "enabled": True,
+                "providers": ["bark", "ntfy"],
+                "bark_title": "小鹏库存提醒",
+                "bark_device_keys": [],
+                "bark_device_keys_file": "",
+                "bark_level": "timeSensitive",
+                "ntfy_topic": "",
+                "ntfy_priority": "high",
+            },
+        }
+
+    return {
+        "chrome": {
+            "remote_debugging_port": 9222,
+            "user_data_dir": "data/chrome-profile",
+            "executable_path": "",
+            "incognito": False,
+            "window_width": 1440,
+            "window_height": 900,
+            "extra_args": [],
+        },
+        "monitor": {
+            "target_url": TARGET_URL,
+            "tabs": TAB_NAMES,
+            "manual_query_only": True,
+            "parallel_tabs": False,
+            "parallel_series_per_tab": 4,
+            "result_preview_limit": 3,
+            "poll_interval_seconds": 30,
+            "poll_interval_min_seconds": 30,
+            "poll_interval_max_seconds": 30,
+            "query_timeout_ms": 15000,
+            "notify_once": True,
+            "notify_cooldown_seconds": 7200,
+            "state_file": "data/notified.json",
+            "series_name_exclude": DEFAULT_EXCLUDED_SERIES_NAMES,
+        },
+        "wechat": {
+            "enabled": True,
+            "provider": "bark",
+            "providers": ["bark", "ntfy"],
+            "bark_server_url": "https://api.day.app",
+            "bark_title": "小鹏库存提醒",
+            "bark_device_key": "",
+            "bark_device_keys": [],
+            "bark_device_keys_file": "config/bark_keys.txt",
+            "bark_group": "小鹏库存",
+            "bark_level": "timeSensitive",
+            "bark_sound": "alarm",
+            "bark_badge": 1,
+            "ntfy_server_url": "https://ntfy.sh",
+            "ntfy_topic": "",
+            "ntfy_token": "",
+            "ntfy_priority": "high",
+            "ntfy_tags": "car,warning",
+            "pushplus_token": "",
+            "pushplus_topic": "",
+            "serverchan_sendkey": "",
+            "work_wechat_webhook_url": "",
+            "users_file": "config/wechat_users.txt",
+        },
+    }

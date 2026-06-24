@@ -16,9 +16,11 @@ from .chrome import ChromeLaunchError, ensure_debug_chrome
 from .config import (
     AppConfig,
     ensure_default_files,
+    get_config_base_dir,
     get_poll_interval_range,
     load_app_config,
     pick_poll_interval_seconds,
+    resolve_default_config_path,
 )
 from .monitor import Hit, InventoryMonitor, get_or_open_target_page
 from .notifier import Notifier, create_notifier
@@ -50,11 +52,12 @@ class TabRuntimeContext:
 
 def main() -> int:
     args = parse_args()
-    setup_logging(args.verbose)
+    config_path = resolve_default_config_path(args.config)
+    setup_logging(args.verbose, config_base_dir=get_config_base_dir(config_path))
 
-    config_path = Path(args.config)
     ensure_default_files(config_path)
     config = load_app_config(config_path)
+    LOGGER.info("使用配置文件: %s", config_path.resolve())
     if config.monitor.manual_query_only and config.monitor.parallel_tabs:
         LOGGER.info(
             "当前为手动筛选并行模式：你手动维护筛选条件，脚本会并行点击 4 个栏目的查询按钮"
@@ -592,8 +595,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "-c",
         "--config",
-        default="config/config.json",
-        help="配置文件路径，默认 config/config.json",
+        default=None,
+        help="配置文件路径；打包版默认读取可执行文件同级的 config.json",
     )
     parser.add_argument(
         "--init",
@@ -644,7 +647,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def setup_logging(verbose: bool) -> None:
+def setup_logging(verbose: bool, config_base_dir: Path) -> None:
     level = logging.DEBUG if verbose else logging.INFO
     log_format = logging.Formatter(
         fmt="%(asctime)s %(levelname)s %(message)s",
@@ -659,7 +662,7 @@ def setup_logging(verbose: bool) -> None:
     console_handler.setFormatter(log_format)
     root_logger.addHandler(console_handler)
 
-    log_dir = Path("logs")
+    log_dir = config_base_dir / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     file_handler = RotatingFileHandler(
         log_dir / "monitor.log",

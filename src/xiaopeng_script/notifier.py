@@ -238,6 +238,7 @@ def _create_provider_notifier(
     if normalized_provider == "bark":
         device_keys = load_bark_device_keys(
             config.bark_device_key,
+            config.bark_device_keys,
             config.bark_device_keys_file,
         )
         if not device_keys:
@@ -288,20 +289,28 @@ def _create_provider_notifier(
     raise RuntimeError(f"不支持的微信通知 provider: {provider}")
 
 
-def load_bark_device_keys(device_key: str, keys_file: Path) -> list[str]:
+def load_bark_device_keys(
+    device_key: str,
+    device_keys: list[str],
+    keys_file: Path | None,
+) -> list[str]:
     values: list[str] = []
     if device_key.strip():
         values.append(_normalize_bark_key(device_key))
+    for raw_device_key in device_keys:
+        if raw_device_key.strip():
+            values.append(_normalize_bark_key(raw_device_key))
 
-    keys_file.parent.mkdir(parents=True, exist_ok=True)
-    if not keys_file.exists():
-        keys_file.write_text("", encoding="utf-8")
+    if keys_file is not None:
+        keys_file.parent.mkdir(parents=True, exist_ok=True)
+        if not keys_file.exists():
+            keys_file.write_text("", encoding="utf-8")
 
-    for raw_line in keys_file.read_text(encoding="utf-8").splitlines():
-        value = raw_line.strip()
-        if not value or value.startswith("#"):
-            continue
-        values.append(_normalize_bark_key(value))
+        for raw_line in keys_file.read_text(encoding="utf-8").splitlines():
+            value = raw_line.strip()
+            if not value or value.startswith("#"):
+                continue
+            values.append(_normalize_bark_key(value))
 
     return _dedupe([value for value in values if value])
 
