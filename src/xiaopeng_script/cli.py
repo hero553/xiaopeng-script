@@ -22,6 +22,7 @@ from .config import (
     pick_poll_interval_seconds,
     resolve_default_config_path,
 )
+from .constants import TAB_EXECUTION_MODE_PARALLEL
 from .monitor import Hit, InventoryMonitor, get_or_open_target_page
 from .notifier import Notifier, create_notifier
 from .query_api import (
@@ -58,7 +59,12 @@ def main() -> int:
     ensure_default_files(config_path)
     config = load_app_config(config_path)
     LOGGER.info("使用配置文件: %s", config_path.resolve())
-    if config.monitor.manual_query_only and config.monitor.parallel_tabs:
+    is_parallel_tab_mode = (
+        config.monitor.tab_execution_mode == TAB_EXECUTION_MODE_PARALLEL
+    )
+    if config.monitor.tab_execution_mode == "fixed_current_tab":
+        LOGGER.info("当前为固定当前栏目模式：脚本不会自动切换 tab，只查询你当前停留的栏目")
+    elif config.monitor.manual_query_only and is_parallel_tab_mode:
         LOGGER.info(
             "当前为手动筛选并行模式：你手动维护筛选条件，脚本会并行点击 4 个栏目的查询按钮"
         )
@@ -87,7 +93,7 @@ def main() -> int:
         notifier = create_notifier(config.wechat)
         store = NotifiedStore(config.monitor.state_file)
 
-        if args.diagnose or args.list_series or not config.monitor.parallel_tabs:
+        if args.diagnose or args.list_series or not is_parallel_tab_mode:
             with sync_playwright() as playwright:
                 browser = playwright.chromium.connect_over_cdp(endpoint)
                 page = get_or_open_target_page(browser, config.monitor.target_url)
@@ -157,7 +163,7 @@ def main() -> int:
 def _wait_for_login(endpoint: str, config: AppConfig) -> None:
     with sync_playwright() as playwright:
         browser = playwright.chromium.connect_over_cdp(endpoint)
-        if config.monitor.manual_query_only and config.monitor.parallel_tabs:
+        if config.monitor.tab_execution_mode == TAB_EXECUTION_MODE_PARALLEL:
             _ensure_parallel_pages(
                 browser=browser,
                 target_url=config.monitor.target_url,
@@ -172,6 +178,9 @@ def _wait_for_login(endpoint: str, config: AppConfig) -> None:
             return
 
         get_or_open_target_page(browser, config.monitor.target_url)
+        if config.monitor.tab_execution_mode == "fixed_current_tab":
+            input("请确认页面已经登录，并且已经停留在你要固定查询的栏目，然后按回车开始巡检...")
+            return
         input("请确认页面已经登录并停留在后台页面，然后按回车开始巡检...")
 
 

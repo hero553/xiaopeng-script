@@ -47,6 +47,12 @@ dist/
 
 打包时自动生成的是一份精简版配置，只保留最常改的字段，其他参数由程序默认值兜底。
 
+`monitor.tab_execution_mode` 用来控制栏目怎么查：
+
+- `fixed_current_tab`：固定当前栏目，不自动切换 tab
+- `sequential_tabs`：按配置顺序依次切换栏目查询
+- `parallel_tabs`：4 个栏目并行查询
+
 默认推荐同时开启 `Bark + ntfy`：
 
 - iOS 用 `Bark`，系统推送体验更好。
@@ -219,6 +225,12 @@ xiaopeng-monitor --wait-login
 - 这个模式下，`parallel_tabs` 和 `parallel_series_per_tab` 不再参与巡检流程。
 - 如果以后想恢复旧的“按车系自动轮询”模式，再把 `manual_query_only` 改成 `false`。
 
+如果你想控制 tab 切换方式，直接改 `monitor.tab_execution_mode`：
+
+- `fixed_current_tab`：完全不切 tab，只查你当前停留的栏目
+- `sequential_tabs`：单页面顺序切 4 个栏目再查
+- `parallel_tabs`：准备 4 个固定页面，每个页面绑定一个栏目并行查
+
 `monitor.poll_interval_min_seconds` 和 `monitor.poll_interval_max_seconds` 用来控制每轮之间的随机等待时间。
 
 - 例如最小 `1`、最大 `2`，就表示每轮结束后随机等待 `1` 到 `2` 秒再开始下一轮。
@@ -291,3 +303,9 @@ Windows PowerShell:
 - 程序连接的是 `config/config.json` 里配置的 Chrome 调试端口，默认 `9222`。
 - 程序启动的 Chrome 使用独立用户目录 `data/chrome-profile`，不会直接操作你的日常 Chrome 个人目录。
 - 如果你的页面组件或表格结构和默认判断不一致，第一次运行时需要根据日志微调选择器。
+- 固定当前栏目，不切 tab
+  - `"tab_execution_mode": "fixed_current_tab"`
+- 顺序切换栏目查询
+  - `"tab_execution_mode": "sequential_tabs"`
+- 切换 tab，并行查询
+  - `"tab_execution_mode": "parallel_tabs"`

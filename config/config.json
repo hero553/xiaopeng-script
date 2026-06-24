@@ -16,6 +16,7 @@
       "专项车",
       "可售展车"
     ],
+    "tab_execution_mode": "sequential_tabs",
     "manual_query_only": true,
     "parallel_tabs": false,
     "parallel_series_per_tab": 4,

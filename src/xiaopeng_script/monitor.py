@@ -12,6 +12,7 @@ from .config import MonitorConfig
 from .constants import (
     CURRENT_FILTER_SERIES_CODE,
     CURRENT_FILTER_SERIES_NAME,
+    CURRENT_TAB_NAME,
     NO_DATA_TEXTS,
 )
 from .notifier import Notifier
@@ -77,6 +78,10 @@ class InventoryMonitor:
         hits: list[Hit] = []
         self._ensure_page_ready()
 
+        if self._should_use_fixed_current_tab():
+            hit = self._query_current_filters(CURRENT_TAB_NAME)
+            return [hit] if hit else []
+
         for tab_name in self.config.tabs:
             LOGGER.info("切换栏目: %s", tab_name)
             if not self._click_tab(tab_name):
@@ -92,6 +97,19 @@ class InventoryMonitor:
     def _run_series_query_once(self) -> list[Hit]:
         hits: list[Hit] = []
         self._ensure_page_ready()
+
+        if self._should_use_fixed_current_tab():
+            series_names = self._collect_series_names()
+            if not series_names:
+                LOGGER.warning("当前栏目没有读取到车系列表")
+                return []
+
+            LOGGER.info("当前栏目读取到 %s 个车系", len(series_names))
+            for series_name in series_names:
+                hit = self._query_series(CURRENT_TAB_NAME, series_name)
+                if hit:
+                    hits.append(hit)
+            return hits
 
         for tab_name in self.config.tabs:
             LOGGER.info("切换栏目: %s", tab_name)
@@ -494,6 +512,9 @@ class InventoryMonitor:
             return self.page.get_by_text(text, exact=True).first.is_visible(timeout=1_000)
         except PlaywrightTimeoutError:
             return False
+
+    def _should_use_fixed_current_tab(self) -> bool:
+        return self.config.tab_execution_mode == "fixed_current_tab"
 
 
 def get_or_open_target_page(browser: Browser, target_url: str) -> Page:

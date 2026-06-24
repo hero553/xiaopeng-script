@@ -7,7 +7,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .constants import DEFAULT_EXCLUDED_SERIES_NAMES, TAB_NAMES, TARGET_URL
+from .constants import (
+    DEFAULT_EXCLUDED_SERIES_NAMES,
+    DEFAULT_TAB_EXECUTION_MODE,
+    TAB_EXECUTION_MODE_FIXED_CURRENT,
+    TAB_EXECUTION_MODE_PARALLEL,
+    TAB_NAMES,
+    TARGET_URL,
+)
 
 
 @dataclass(frozen=True)
@@ -25,6 +32,7 @@ class ChromeConfig:
 class MonitorConfig:
     target_url: str = TARGET_URL
     tabs: list[str] = field(default_factory=lambda: list(TAB_NAMES))
+    tab_execution_mode: str = DEFAULT_TAB_EXECUTION_MODE
     manual_query_only: bool = True
     parallel_tabs: bool = True
     parallel_series_per_tab: int = 4
@@ -137,6 +145,7 @@ def load_app_config(config_path: Path) -> AppConfig:
     monitor = MonitorConfig(
         target_url=str(monitor_raw.get("target_url", TARGET_URL)),
         tabs=list(monitor_raw.get("tabs", TAB_NAMES)),
+        tab_execution_mode=_resolve_tab_execution_mode(monitor_raw),
         manual_query_only=bool(
             monitor_raw.get(
                 "manual_query_only",
@@ -360,6 +369,7 @@ def _build_default_config_payload(is_standalone_config: bool) -> dict[str, Any]:
     if is_standalone_config:
         return {
             "monitor": {
+                "tab_execution_mode": DEFAULT_TAB_EXECUTION_MODE,
                 "parallel_tabs": False,
                 "parallel_series_per_tab": 4,
                 "poll_interval_seconds": 30,
@@ -392,6 +402,7 @@ def _build_default_config_payload(is_standalone_config: bool) -> dict[str, Any]:
         "monitor": {
             "target_url": TARGET_URL,
             "tabs": TAB_NAMES,
+            "tab_execution_mode": DEFAULT_TAB_EXECUTION_MODE,
             "manual_query_only": True,
             "parallel_tabs": False,
             "parallel_series_per_tab": 4,
@@ -430,3 +441,17 @@ def _build_default_config_payload(is_standalone_config: bool) -> dict[str, Any]:
             "users_file": "config/wechat_users.txt",
         },
     }
+
+
+def _resolve_tab_execution_mode(monitor_raw: dict[str, Any]) -> str:
+    raw_mode = str(monitor_raw.get("tab_execution_mode", "")).strip().lower()
+    if raw_mode in {
+        TAB_EXECUTION_MODE_FIXED_CURRENT,
+        DEFAULT_TAB_EXECUTION_MODE,
+        TAB_EXECUTION_MODE_PARALLEL,
+    }:
+        return raw_mode
+
+    if bool(monitor_raw.get("parallel_tabs", False)):
+        return TAB_EXECUTION_MODE_PARALLEL
+    return DEFAULT_TAB_EXECUTION_MODE
